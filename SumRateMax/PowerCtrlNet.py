@@ -101,7 +101,7 @@ class PowerCtrlNet:
         self.net_out_before_sigmoid = None
         self.net_out = None
         # batch normalization
-        self.iter = tf.placeholder(tf.int32)
+        self.iter = tf.compat.v1.placeholder(tf.int32)
         self.best_means = {}
         self.best_variances = {}
         self.scaling_factors = {}
@@ -136,8 +136,8 @@ class PowerCtrlNet:
             bias_name = format("bias_%d_%d" % (layer, model_id))
             if built_for_training:
                 if self.top_config.initialization=="Xavier":
-                    self.weights[layer] = tf.get_variable(name=weight_name, shape=shape, dtype=tf.float32, initializer=tf.contrib.layers.xavier_initializer())
-                    self.biases[layer] = tf.get_variable(name=bias_name, shape=[shape[1]], dtype=tf.float32, initializer=tf.contrib.layers.xavier_initializer())
+                    self.weights[layer] = tf.compat.v1.get_variable(name=weight_name, shape=shape, dtype=tf.float32, initializer=tf.compat.v1.initializers.glorot_normal())
+                    self.biases[layer] = tf.compat.v1.get_variable(name=bias_name, shape=[shape[1]], dtype=tf.float32, initializer=tf.compat.v1.initializers.glorot_normal())
                 elif self.top_config.initialization=="TN":
                     self.weights[layer] = tf.Variable(tf.truncated_normal(shape=shape, stddev=0.35, dtype=np.float32), dtype=tf.float32)
                     self.biases[layer] = tf.Variable(tf.zeros(shape=[shape[1]], dtype=tf.float32), dtype=tf.float32)
@@ -203,24 +203,24 @@ class PowerCtrlNet:
         rx_pos_y = tf.reshape(rx_pos_y, [batch_size, 1, user_num]) + np.zeros([1, user_num, 1])
         d = tf.sqrt(tf.square(tx_pos_x - rx_pos_x) + tf.square(tx_pos_y - rx_pos_y))
         G = tf.divide(1, 1 + d ** alpha)
-        rayleigh_coeff = (tf.square(tf.random_normal([batch_size, user_num, user_num])) + tf.square(tf.random_normal([batch_size, user_num, user_num]))) / 2
+        rayleigh_coeff = (tf.square(tf.random.normal([batch_size, user_num, user_num])) + tf.square(tf.random.normal([batch_size, user_num, user_num]))) / 2
         random_csi = tf.sqrt(tf.reshape(G * rayleigh_coeff, [batch_size, user_num**2]))
         return random_csi
 
     def generate_net_in(self, built_for_training):
         if built_for_training:
             if self.top_config.load_data_from_files:
-                self.net_in_train = tf.placeholder(tf.float32, [None, self.top_config.input_len])
+                self.net_in_train = tf.compat.v1.placeholder(tf.float32, [None, self.top_config.input_len])
             else:
                 self.net_in_train = tf.Variable(tf.zeros(shape=[self.top_config.training_mini_batch_size, self.top_config.input_len]), dtype=tf.float32)
-                tf.set_random_seed(self.top_config.train_seed)
+                tf.compat.v1.set_random_seed(self.top_config.train_seed)
                 if self.top_config.csi_distribution=="Rice":
-                    random_gen_csi = tf.sqrt(tf.square(1+tf.random_normal([self.top_config.training_mini_batch_size, self.top_config.input_len])) +
-                                             tf.square(1+tf.random_normal([self.top_config.training_mini_batch_size,
+                    random_gen_csi = tf.sqrt(tf.square(1+tf.random.normal([self.top_config.training_mini_batch_size, self.top_config.input_len])) +
+                                             tf.square(1+tf.random.normal([self.top_config.training_mini_batch_size,
                                                                          self.top_config.input_len]))) / 2
                 elif self.top_config.csi_distribution=="Rayleigh":
-                    random_gen_csi = tf.sqrt(tf.square(tf.random_normal([self.top_config.training_mini_batch_size, self.top_config.input_len])) +
-                                             tf.square(tf.random_normal([self.top_config.training_mini_batch_size,
+                    random_gen_csi = tf.sqrt(tf.square(tf.random.normal([self.top_config.training_mini_batch_size, self.top_config.input_len])) +
+                                             tf.square(tf.random.normal([self.top_config.training_mini_batch_size,
                                                                          self.top_config.input_len]))) / tf.sqrt(2.0)
                 elif self.top_config.csi_distribution=="Geometry":
                     random_gen_csi = self.generate_geometric_csi()
@@ -228,10 +228,10 @@ class PowerCtrlNet:
                 self.assign_net_in_train = self.net_in_train.assign(random_gen_csi)
 
             self.net_in_test = tf.Variable(tf.zeros(shape=[self.top_config.test_sample_num, self.top_config.input_len]), dtype=tf.float32)
-            self.is_in_train = tf.placeholder(tf.bool)
+            self.is_in_train = tf.compat.v1.placeholder(tf.bool)
             self.net_in = tf.cond(self.is_in_train, lambda: self.net_in_train, lambda: self.net_in_test)
         else:
-            self.net_in = tf.placeholder(tf.float32, [None, self.top_config.input_len])
+            self.net_in = tf.compat.v1.placeholder(tf.float32, [None, self.top_config.input_len])
 
     def generate_assign_ops(self, moving_means, moving_variances, total_layer_num):
         self.assign_best_weights = [self.best_weights[layer].assign(self.weights[layer]) for layer in range(total_layer_num)]
@@ -323,10 +323,10 @@ class PowerCtrlNet:
         optimizer = tf.train.AdamOptimizer().minimize(loss)
 
         # init operation
-        init = tf.global_variables_initializer()
+        init = tf.compat.v1.global_variables_initializer()
 
         # create a session
-        sess = tf.Session()
+        sess = tf.compat.v1.Session()
         sess.run(init)
 
         # load data for test
